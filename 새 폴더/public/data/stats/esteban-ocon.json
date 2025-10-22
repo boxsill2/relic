@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "ocon",
+    "slug": "esteban-ocon",
+    "full_name": "Esteban Ocon",
+    "number": "31",
+    "code": "OCO",
+    "nationality": "French",
+    "photo_src": "/images/drivers/31.png",
+    "team_name": "Haas F1 Team",
+    "team_colour": "#B6BABD"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 24.0,
+    "gp_podiums": 0,
+    "gp_top10": 6,
+    "dnfs": 7,
+    "season_position": "15",
+    "season_points": "28"
+  },
+  "career": {
+    "gp_entered": 100,
+    "career_points": 321.0,
+    "podiums": 2,
+    "dnfs": 15,
+    "poles": 1,
+    "best_finish": 1,
+    "best_grid": 3,
+    "titles": 0
+  }
+}

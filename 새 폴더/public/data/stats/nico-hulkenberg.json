@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "hulkenberg",
+    "slug": "nico-hulkenberg",
+    "full_name": "Nico Hulkenberg",
+    "number": "27",
+    "code": "HUL",
+    "nationality": "German",
+    "photo_src": "/images/drivers/27.png",
+    "team_name": "Sauber",
+    "team_colour": "#FFFFFF"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 41.0,
+    "gp_podiums": 1,
+    "gp_top10": 6,
+    "dnfs": 9,
+    "season_position": "9",
+    "season_points": "41"
+  },
+  "career": {
+    "gp_entered": 100,
+    "career_points": 296.0,
+    "podiums": 0,
+    "dnfs": 19,
+    "poles": 0,
+    "best_finish": 4,
+    "best_grid": 1,
+    "titles": 0
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "norris",
+    "slug": "lando-norris",
+    "full_name": "Lando Norris",
+    "number": "4",
+    "code": "NOR",
+    "nationality": "British",
+    "photo_src": "/images/drivers/4.png",
+    "team_name": "McLaren",
+    "team_colour": "#FF8000"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 317.0,
+    "gp_podiums": 15,
+    "gp_top10": 17,
+    "dnfs": 2,
+    "season_position": "2",
+    "season_points": "332"
+  },
+  "career": {
+    "gp_entered": 100,
+    "career_points": 567.0,
+    "podiums": 12,
+    "dnfs": 13,
+    "poles": 9,
+    "best_finish": 2,
+    "best_grid": 1,
+    "titles": 0
+  }
+}

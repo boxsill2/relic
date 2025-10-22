@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "colapinto",
+    "slug": "franco-colapinto",
+    "full_name": "Franco Colapinto",
+    "number": "43",
+    "code": "COL",
+    "nationality": "Argentine",
+    "photo_src": "/images/drivers/43.png",
+    "team_name": "Alpine F1 Team",
+    "team_colour": "#FFFFFF"
+  },
+  "season": {
+    "gp_races": 13,
+    "gp_points": 0.0,
+    "gp_podiums": 0,
+    "gp_top10": 0,
+    "dnfs": 9,
+    "season_position": "20",
+    "season_points": "0"
+  },
+  "career": {
+    "gp_entered": 22,
+    "career_points": 5.0,
+    "podiums": 0,
+    "dnfs": 14,
+    "poles": 0,
+    "best_finish": 8,
+    "best_grid": 9,
+    "titles": 0
+  }
+}

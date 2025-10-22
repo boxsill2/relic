@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const { spawn } = require('child_process');
-
+const driversData = require('./public/data/drivers.json');
+const driverDescriptions = require('./public/data/driver_descriptions.json');
 const router = express.Router();
 const ROOT_DIR = __dirname;
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
@@ -32,6 +33,26 @@ router.get('/drivers', async (req, res) => {
     } catch (e) {
         res.status(500).render('drivers', { drivers: [], error: '드라이버 데이터를 불러오는 데 실패했습니다.', currentPage: 'drivers' });
     }
+});
+router.get('/drivers/:driverName', (req, res) => {
+  const driverName = req.params.driverName;
+  const driver = driversData.find(d => d.slug === driverName);
+
+  if (driver) {
+    const description = driverDescriptions[driver.slug];
+    const driverDetailData = { ...driver, description: description || "설명 없음" };
+
+    // --- >>> 로그 추가 <<< ---
+    console.log("Rendering driver detail with data:", JSON.stringify(driverDetailData, null, 2));
+    // --- >>> 로그 추가 끝 <<< ---
+
+    res.render('driver-detail', { driver: driverDetailData, currentPage: 'drivers', error: null });
+  } else {
+     // --- >>> 로그 추가 <<< ---
+    console.log(`Driver not found for slug: ${driverName}`);
+     // --- >>> 로그 추가 끝 <<< ---
+    res.status(404).render('driver-detail', { driver: null, error: 'Driver not found', currentPage: 'drivers' });
+  }
 });
 
 // 팀 목록 페이지

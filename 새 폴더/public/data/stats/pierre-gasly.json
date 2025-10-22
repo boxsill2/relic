@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "gasly",
+    "slug": "pierre-gasly",
+    "full_name": "Pierre Gasly",
+    "number": "10",
+    "code": "GAS",
+    "nationality": "French",
+    "photo_src": "/images/drivers/10.png",
+    "team_name": "Alpine F1 Team",
+    "team_colour": "#FFFFFF"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 19.0,
+    "gp_podiums": 0,
+    "gp_top10": 4,
+    "dnfs": 10,
+    "season_position": "17",
+    "season_points": "20"
+  },
+  "career": {
+    "gp_entered": 100,
+    "career_points": 327.0,
+    "podiums": 3,
+    "dnfs": 18,
+    "poles": 1,
+    "best_finish": 1,
+    "best_grid": 4,
+    "titles": 0
+  }
+}
