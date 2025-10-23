@@ -2,41 +2,61 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title><%= info?.name || 'Team' %> - 팀 상세</title>
+  <%# team 객체가 있을 경우 team_name 사용, 없으면 'Team' %>
+  <title><%= team?.team_name || 'Team' %> - 팀 상세</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="/css/base.css?v=f1" />
   <link rel="stylesheet" href="/css/header-style.css?v=f1" />
-  <link rel="stylesheet" href="/css/team-detail-style.css?v=f1" />
+  <link rel="stylesheet" href="/css/team-detail-style.css?v=f1" /> <%# CSS 파일 확인 %>
+  <link rel="stylesheet" href="/css/driver-style.css?v=f1" /> <%# 드라이버 카드용 CSS 추가 %>
 </head>
 <body class="theme-f1 team-detail-page">
   <%- include('partials/header', { currentPage: 'teams' }) %>
 
   <main class="container">
+    <%# 서버에서 전달된 error 변수가 있으면 표시 %>
     <% if (error) { %>
       <div class="card"><p><%= error %></p></div>
-    <% } else if (info) { %>
+    <%# error가 없고 team 객체가 있으면 팀 정보 표시 %>
+    <% } else if (team) { %>
       <header class="page-header" style="text-align: left; border-bottom: 1px solid var(--line); padding-bottom: 1rem; margin-bottom: 1.5rem;">
         <div style="display: flex; align-items: center; gap: 20px;">
-          <img src="<%= info.logoUrl %>" alt="<%= info.name %> 로고" style="width: 80px; height: 80px; object-fit: contain;">
+          <%# 팀 로고 표시 (teams.json에 logo_url 또는 유사 속성 필요) %>
+          <img src="<%= team.logo_url || '/images/teams/default-logo.png' %>" alt="<%= team.team_name %> 로고" style="width: 80px; height: 80px; object-fit: contain;" onerror="this.src='/images/teams/default-logo.png'">
           <div>
-            <h1 class="page-title" style="margin: 0;"><%= info.koreanName || info.name %></h1>
-            <p class="page-desc" style="margin: 5px 0 0;"><%= info.name %></p>
+            <%# 팀 이름 표시 (teams.json에 korean_name 또는 유사 속성 필요) %>
+            <h1 class="page-title" style="margin: 0;"><%= team.korean_name || team.team_name %></h1>
+            <p class="page-desc" style="margin: 5px 0 0;"><%= team.team_name %></p>
           </div>
         </div>
       </header>
-      
+
       <section>
         <h2>소속 드라이버</h2>
-        <div class="grid grid--wide">
-            <% (info.drivers || []).forEach(driver => { %>
-                <a href="/drivers/<%= slugify(driver) %>" class="card" style="padding: 1rem; text-decoration: none;">
-                    <h3 style="margin: 0;"><%= driver %></h3>
-                </a>
+        <%# f1api.js에서 전달된 drivers 배열 확인 %>
+        <% if (drivers && drivers.length > 0) { %>
+          <div class="grid grid--wide driver-list"> <%# 드라이버 목록 스타일 적용 %>
+            <% drivers.forEach(driver => { %>
+              <%# 드라이버 카드 링크 (driver.slug 사용) %>
+              <a href="/drivers/<%= driver.slug %>" class="driver-card card">
+                <div class="driver-photo">
+                   <%# 드라이버 사진 표시 (driver.photo_src 사용) %>
+                  <img src="<%= driver.photo_src %>" alt="<%= driver.full_name %>" loading="lazy" decoding="async" onerror="this.remove()">
+                </div>
+                <div class="driver-info">
+                  <span class="driver-number">#<%= driver.number %></span>
+                  <h3 class="driver-card-name"><%= driver.full_name %></h3>
+                  <p class="driver-card-team"><%= driver.team_name %></p>
+                </div>
+              </a>
             <% }) %>
-        </div>
+          </div>
+        <% } else { %>
+            <p>이 팀에 소속된 드라이버 정보가 없습니다.</p>
+        <% } %>
       </section>
 
-    <% } %>
+    <% } %> <%# if (team) 끝 %>
   </main>
 </body>
 </html>

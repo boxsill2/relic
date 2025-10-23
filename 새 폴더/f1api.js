@@ -5,72 +5,126 @@ const express = require('express');
 const { spawn } = require('child_process');
 const driversData = require('./public/data/drivers.json');
 const driverDescriptions = require('./public/data/driver_descriptions.json');
+const teamsData = require('./public/data/teams.json'); // 팀 데이터 로드 확인
 const router = express.Router();
 const ROOT_DIR = __dirname;
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 const DATA_DIR = path.join(PUBLIC_DIR, 'data');
 
-async function readJSON(filePath) { try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { return null; } }
+// readJSON 함수는 동기 함수로 유지
+function readJSON(filePath) { try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { return null; } }
 function slugify(text) { return String(text || '').toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-'); }
 
 // --- 라우팅 설정 ---
 router.get('/', (req, res) => res.redirect('/schedule'));
 
-router.get('/schedule', async (req, res) => {
+router.get('/schedule', (req, res) => { // async 제거
     try {
-        const schedule = await readJSON(path.join(DATA_DIR, 'schedule.json'));
+        const schedule = readJSON(path.join(DATA_DIR, 'schedule.json'));
         res.render('schedule', { year: new Date().getFullYear(), schedule: schedule || [], error: null, currentPage: 'schedule' });
     } catch (e) { res.render('schedule', { year: new Date().getFullYear(), schedule: [], error: '스케줄 데이터를 불러오지 못했습니다.', currentPage: 'schedule' }); }
 });
 
-// --- 추가된 라우터 ---
-
 // 드라이버 목록 페이지
-router.get('/drivers', async (req, res) => {
+router.get('/drivers', (req, res) => { // async 제거
     try {
-        const drivers = await readJSON(path.join(DATA_DIR, 'drivers.json'));
-        res.render('drivers', { drivers: drivers || [], currentPage: 'drivers' });
+        const drivers = readJSON(path.join(DATA_DIR, 'drivers.json'));
+        res.render('drivers', { drivers: drivers || [], currentPage: 'drivers', error: null });
     } catch (e) {
         res.status(500).render('drivers', { drivers: [], error: '드라이버 데이터를 불러오는 데 실패했습니다.', currentPage: 'drivers' });
     }
 });
-router.get('/drivers/:driverName', (req, res) => {
+
+// 드라이버 상세 페이지
+router.get('/drivers/:driverName', (req, res) => { // async 제거
   const driverName = req.params.driverName;
   const driver = driversData.find(d => d.slug === driverName);
 
   if (driver) {
     const description = driverDescriptions[driver.slug];
-    const driverDetailData = { ...driver, description: description || "설명 없음" };
-
-    // --- >>> 로그 추가 <<< ---
-    console.log("Rendering driver detail with data:", JSON.stringify(driverDetailData, null, 2));
-    // --- >>> 로그 추가 끝 <<< ---
-
-    res.render('driver-detail', { driver: driverDetailData, currentPage: 'drivers', error: null });
+    let driverStats = null;
+    try {
+      const statsFilePath = path.join(DATA_DIR, 'stats', `${driver.slug}.json`);
+      driverStats = readJSON(statsFilePath);
+    } catch (e) {
+      console.error(`Error reading stats file for ${driver.slug}:`, e);
+    }
+    const driverDetailData = {
+      ...driver,
+      description: description || "설명 없음",
+      stats: driverStats || { season: null, career: null }
+    };
+    res.render('driver-detail', {
+        driver: driverDetailData,
+        currentPage: 'drivers',
+        error: null
+    });
   } else {
-     // --- >>> 로그 추가 <<< ---
-    console.log(`Driver not found for slug: ${driverName}`);
-     // --- >>> 로그 추가 끝 <<< ---
-    res.status(404).render('driver-detail', { driver: null, error: 'Driver not found', currentPage: 'drivers' });
+    res.status(404).render('driver-detail', {
+        driver: null,
+        error: 'Driver not found',
+        currentPage: 'drivers'
+    });
   }
 });
 
 // 팀 목록 페이지
-router.get('/teams', async (req, res) => {
+router.get('/teams', (req, res) => { // async 제거
     try {
-        const teams = await readJSON(path.join(DATA_DIR, 'teams.json'));
-        res.render('teams', { teams: teams || [], currentPage: 'teams' });
+        const teams = readJSON(path.join(DATA_DIR, 'teams.json'));
+        res.render('teams', { teams: teams || [], currentPage: 'teams', error: null });
     } catch (e) {
         res.status(500).render('teams', { teams: [], error: '팀 데이터를 불러오는 데 실패했습니다.', currentPage: 'teams' });
     }
 });
 
+// --- >>> 팀 상세 페이지 라우트 (디버깅 로그 추가됨) <<< ---
+router.get('/teams/:teamName', (req, res) => {
+  const teamSlug = req.params.teamName; // URL에서 팀 슬러그 가져오기
+  console.log(`\n--- Team Detail Request ---`); // 로그 시작 구분
+  console.log(`[Team Detail] Requested team slug: "${teamSlug}"`); // 요청된 슬러그 로그
+
+  // teams.json 데이터에서 slug가 일치하는 팀 찾기
+  const team = teamsData.find(t => t.slug === teamSlug);
+
+  if (team) {
+    console.log(`[Team Detail] Found team object with name: "${team.name}"`); // 찾은 팀 이름 로그
+
+    // 해당 팀 소속 드라이버 찾기
+    console.log(`[Team Detail] Filtering drivers where driver.team_name === "${team.name}"`); // 필터링 조건 로그
+    const teamDrivers = driversData.filter(driver => {
+         // 각 드라이버 비교 로그 (매우 상세하므로 필요시에만 주석 해제)
+         // console.log(`  -> Comparing: Driver "${driver.team_name}" === Team "${team.name}" -> ${driver.team_name === team.name}`);
+         return driver.team_name === team.name; // team.name 사용 확인
+     });
+    console.log(`[Team Detail] Found ${teamDrivers.length} drivers.`); // 찾은 드라이버 수 로그
+    if (teamDrivers.length > 0) {
+      console.log(`[Team Detail] Driver names: ${teamDrivers.map(d => d.full_name).join(', ')}`); // 찾은 드라이버 이름 목록 로그
+    }
+
+    // team-detail.ejs 템플릿 렌더링
+    res.render('team-detail', {
+      team: team,
+      drivers: teamDrivers,
+      currentPage: 'teams',
+      error: null
+    });
+  } else {
+    console.log(`[Team Detail] Team not found for slug: "${teamSlug}"`); // 팀 못 찾음 로그
+    res.status(404).render('team-detail', {
+        team: null,
+        drivers: [],
+        error: 'Team not found',
+        currentPage: 'teams'
+    });
+  }
+});
+
 // 용어집 페이지
-router.get('/glossary', async (req, res) => {
+router.get('/glossary', (req, res) => { // async 제거
     try {
-        // f1_terms.json은 DATA_DIR이 아닌 ROOT_DIR에 위치
-        const terms = await readJSON(path.join(ROOT_DIR, 'f1_terms.json'));
-        res.render('glossary', { terms: terms || [], currentPage: 'glossary' });
+        const terms = readJSON(path.join(ROOT_DIR, 'f1_terms.json'));
+        res.render('glossary', { terms: terms || [], currentPage: 'glossary', error: null });
     } catch (e) {
         res.status(500).render('glossary', { terms: [], error: '용어 데이터를 불러오는 데 실패했습니다.', currentPage: 'glossary' });
     }
@@ -78,17 +132,17 @@ router.get('/glossary', async (req, res) => {
 
 // --- 기존 코드 유지 ---
 
-router.get('/replays/:session_key', async (req, res) => {
+router.get('/replays/:session_key', (req, res) => { // async 제거
     const { session_key } = req.params;
     try {
-        const schedule = await readJSON(path.join(DATA_DIR, 'schedule.json'));
-        const layouts = await readJSON(path.join(DATA_DIR, 'track_layouts.json'));
+        const schedule = readJSON(path.join(DATA_DIR, 'schedule.json'));
+        const layouts = readJSON(path.join(DATA_DIR, 'track_layouts.json'));
         const sessionInfo = schedule?.find(s => String(s.session_key) === session_key) || null;
-        
+
         if (!sessionInfo) {
-            return res.status(404).render('race-tracker', { error: '해당 세션 정보를 찾을 수 없습니다.' });
+             return res.status(404).render('race-tracker', { error: '해당 세션 정보를 찾을 수 없습니다.', session_key, driverDirectory: {}, sessionInfo: null, currentPage: 'schedule' });
         }
-        
+
         const circuitName = sessionInfo.circuit_short_name?.toLowerCase().replace(/\s+/g, '-');
         const layout = layouts?.find(l => l.circuit_short_name === circuitName);
 
@@ -105,23 +159,25 @@ router.get('/replays/:session_key', async (req, res) => {
             }
         }
 
-        const [drivers, f1Teams] = await Promise.all([
-            readJSON(path.join(DATA_DIR, 'drivers.json')),
-            readJSON(path.join(ROOT_DIR, 'f1_team.json'))
-        ]);
+        const drivers = readJSON(path.join(DATA_DIR, 'drivers.json'));
+        // f1_team.json 파일명 확인 필요
+        const f1Teams = readJSON(path.join(ROOT_DIR, 'f1_team.json')); // 'f1_team.json'이 맞는지 확인
+
         const driverDirectory = {};
         if (drivers && f1Teams) {
+            // f1_team.json 구조에 'name', 'teamColor' 속성이 있는지 확인 필요
             const teamInfoMap = f1Teams.reduce((acc, team) => { acc[team.name] = { color: team.teamColor }; return acc; }, {});
             drivers.forEach(d => { if (d.number) driverDirectory[d.number] = { full_name: d.full_name, team_colour: teamInfoMap[d.team_name]?.color || '#FFFFFF' }; });
         }
-        
+
         const finalSessionInfo = { ...sessionInfo, trackImageUrl, layout };
 
-        res.render('race-tracker', { 
-            session_key, 
-            driverDirectory, 
-            sessionInfo: finalSessionInfo, 
-            currentPage: 'schedule' 
+        res.render('race-tracker', {
+            session_key,
+            driverDirectory,
+            sessionInfo: finalSessionInfo,
+            currentPage: 'schedule',
+            error: null
         });
     } catch (e) {
         console.error(e);
