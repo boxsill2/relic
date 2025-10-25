@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "max_verstappen",
+    "slug": "max-verstappen",
+    "full_name": "Max Verstappen",
+    "number": "33",
+    "code": "VER",
+    "nationality": "Dutch",
+    "photo_src": "/images/drivers/33.png",
+    "team_name": "Red Bull",
+    "team_colour": "#FFFFFF"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 284.0,
+    "gp_podiums": 10,
+    "gp_top10": 18,
+    "dnfs": 1,
+    "season_position": "3",
+    "season_points": "306"
+  },
+  "career": {
+    "gp_entered": 100,
+    "career_points": 905.0,
+    "podiums": 29,
+    "dnfs": 21,
+    "poles": 68,
+    "best_finish": 1,
+    "best_grid": 1,
+    "titles": 4
+  }
+}

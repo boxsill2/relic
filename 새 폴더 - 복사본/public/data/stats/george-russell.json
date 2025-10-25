@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "russell",
+    "slug": "george-russell",
+    "full_name": "George Russell",
+    "number": "63",
+    "code": "RUS",
+    "nationality": "British",
+    "photo_src": "/images/drivers/63.png",
+    "team_name": "Mercedes",
+    "team_colour": "#27F4D2"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 235.0,
+    "gp_podiums": 8,
+    "gp_top10": 18,
+    "dnfs": 1,
+    "season_position": "4",
+    "season_points": "252"
+  },
+  "career": {
+    "gp_entered": 100,
+    "career_points": 411.0,
+    "podiums": 10,
+    "dnfs": 15,
+    "poles": 5,
+    "best_finish": 1,
+    "best_grid": 1,
+    "titles": 0
+  }
+}

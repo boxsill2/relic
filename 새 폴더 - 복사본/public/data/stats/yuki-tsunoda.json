@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "tsunoda",
+    "slug": "yuki-tsunoda",
+    "full_name": "Yuki Tsunoda",
+    "number": "22",
+    "code": "TSU",
+    "nationality": "Japanese",
+    "photo_src": "/images/drivers/22.png",
+    "team_name": "Red Bull",
+    "team_colour": "#FFFFFF"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 20.0,
+    "gp_podiums": 0,
+    "gp_top10": 6,
+    "dnfs": 8,
+    "season_position": "16",
+    "season_points": "28"
+  },
+  "career": {
+    "gp_entered": 100,
+    "career_points": 91.0,
+    "podiums": 0,
+    "dnfs": 36,
+    "poles": 0,
+    "best_finish": 4,
+    "best_grid": 3,
+    "titles": 0
+  }
+}

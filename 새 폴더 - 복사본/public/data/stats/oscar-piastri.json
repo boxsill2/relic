@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "piastri",
+    "slug": "oscar-piastri",
+    "full_name": "Oscar Piastri",
+    "number": "81",
+    "code": "PIA",
+    "nationality": "Australian",
+    "photo_src": "/images/drivers/81.png",
+    "team_name": "McLaren",
+    "team_colour": "#FF8000"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 325.0,
+    "gp_podiums": 14,
+    "gp_top10": 18,
+    "dnfs": 1,
+    "season_position": "1",
+    "season_points": "346"
+  },
+  "career": {
+    "gp_entered": 65,
+    "career_points": 672.0,
+    "podiums": 24,
+    "dnfs": 9,
+    "poles": 9,
+    "best_finish": 1,
+    "best_grid": 1,
+    "titles": 1
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "bortoleto",
+    "slug": "gabriel-bortoleto",
+    "full_name": "Gabriel Bortoleto",
+    "number": "5",
+    "code": "BOR",
+    "nationality": "Brazilian",
+    "photo_src": "/images/drivers/5.png",
+    "team_name": "Sauber",
+    "team_colour": "#FFFFFF"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 18.0,
+    "gp_podiums": 0,
+    "gp_top10": 4,
+    "dnfs": 10,
+    "season_position": "19",
+    "season_points": "18"
+  },
+  "career": {
+    "gp_entered": 19,
+    "career_points": 18.0,
+    "podiums": 0,
+    "dnfs": 10,
+    "poles": 0,
+    "best_finish": 6,
+    "best_grid": 7,
+    "titles": 0
+  }
+}

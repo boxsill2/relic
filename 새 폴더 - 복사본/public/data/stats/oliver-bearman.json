@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "bearman",
+    "slug": "oliver-bearman",
+    "full_name": "Oliver Bearman",
+    "number": "87",
+    "code": "BEA",
+    "nationality": "British",
+    "photo_src": "/images/drivers/87.png",
+    "team_name": "Haas F1 Team",
+    "team_colour": "#B6BABD"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 18.0,
+    "gp_podiums": 0,
+    "gp_top10": 6,
+    "dnfs": 5,
+    "season_position": "18",
+    "season_points": "20"
+  },
+  "career": {
+    "gp_entered": 22,
+    "career_points": 25.0,
+    "podiums": 0,
+    "dnfs": 5,
+    "poles": 0,
+    "best_finish": 6,
+    "best_grid": 8,
+    "titles": 0
+  }
+}

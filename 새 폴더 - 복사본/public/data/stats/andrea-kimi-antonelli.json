@@ -1,0 +1,32 @@
+{
+  "info": {
+    "driverId": "antonelli",
+    "slug": "andrea-kimi-antonelli",
+    "full_name": "Andrea Kimi Antonelli",
+    "number": "12",
+    "code": "ANT",
+    "nationality": "Italian",
+    "photo_src": "/images/drivers/12.png",
+    "team_name": "Mercedes",
+    "team_colour": "#27F4D2"
+  },
+  "season": {
+    "gp_races": 19,
+    "gp_points": 84.0,
+    "gp_podiums": 1,
+    "gp_top10": 10,
+    "dnfs": 6,
+    "season_position": "7",
+    "season_points": "89"
+  },
+  "career": {
+    "gp_entered": 19,
+    "career_points": 84.0,
+    "podiums": 1,
+    "dnfs": 6,
+    "poles": 0,
+    "best_finish": 3,
+    "best_grid": 3,
+    "titles": 0
+  }
+}
