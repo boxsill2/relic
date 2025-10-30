@@ -11,11 +11,11 @@
     "team_colour": "#229971"
   },
   "season": {
-    "gp_races": 19,
+    "gp_races": 20,
     "gp_points": 37.0,
     "gp_podiums": 0,
     "gp_top10": 8,
-    "dnfs": 6,
+    "dnfs": 7,
     "season_position": "12",
     "season_points": "37"
   },

@@ -25,7 +25,7 @@ NAME_FIXES = {
     "Nico Hülkenberg": "Nico Hulkenberg"
 }
 
-def safe_get_request(url, retries=3, delay=5):
+def safe_get_request(url, retries=3, delay=10):
     """
     HTTP GET 요청을 보내고, 429 오류 시 재시도하는 함수
     """

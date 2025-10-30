@@ -11,21 +11,21 @@
     "team_colour": "#B6BABD"
   },
   "season": {
-    "gp_races": 19,
-    "gp_points": 18.0,
+    "gp_races": 20,
+    "gp_points": 30.0,
     "gp_podiums": 0,
-    "gp_top10": 6,
+    "gp_top10": 7,
     "dnfs": 5,
-    "season_position": "18",
-    "season_points": "20"
+    "season_position": "13",
+    "season_points": "32"
   },
   "career": {
-    "gp_entered": 22,
-    "career_points": 25.0,
+    "gp_entered": 23,
+    "career_points": 37.0,
     "podiums": 0,
     "dnfs": 5,
     "poles": 0,
-    "best_finish": 6,
+    "best_finish": 4,
     "best_grid": 8,
     "titles": 0
   }

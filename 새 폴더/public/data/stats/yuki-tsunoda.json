@@ -11,19 +11,19 @@
     "team_colour": "#FFFFFF"
   },
   "season": {
-    "gp_races": 19,
+    "gp_races": 20,
     "gp_points": 20.0,
     "gp_podiums": 0,
     "gp_top10": 6,
     "dnfs": 8,
-    "season_position": "16",
+    "season_position": "17",
     "season_points": "28"
   },
   "career": {
     "gp_entered": 100,
     "career_points": 91.0,
     "podiums": 0,
-    "dnfs": 36,
+    "dnfs": 37,
     "poles": 0,
     "best_finish": 4,
     "best_grid": 3,
