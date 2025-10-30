@@ -9,9 +9,8 @@
     <link rel="stylesheet" href="/css/race-tracker-style.css?v=f1">
     <style>
       .replay-layout {
-        /* 우측 리더보드 제거 → 한 칼럼 */
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 300px;
         gap: 20px;
         align-items: flex-start;
       }
@@ -42,6 +41,26 @@
         border-radius: 12px; display: none; z-index: 10;
         max-width: 80%;
       }
+      .leaderboard-row {
+        display: grid;
+        grid-template-columns: 40px 1fr auto;
+        align-items: center; padding: 6px 8px; border-radius: 6px;
+      }
+      .leaderboard-row:nth-child(odd) { background-color: rgba(255, 255, 255, 0.03); }
+      .leaderboard-row.dnf { opacity: 0.5; }
+      .leaderboard-row .pos { font-weight: bold; text-align: center; }
+      .leaderboard-row .driver-name {
+        display: flex; align-items: center; white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis;
+      }
+      .leaderboard-row .team-color-indicator {
+        width: 6px; height: 16px; border-radius: 3px; display: inline-block;
+        margin-right: 8px; flex-shrink: 0;
+      }
+      .driver-status-tag {
+        font-size: 10px; font-weight: bold; padding: 2px 5px; border-radius: 4px; color: #000;
+      }
+      .driver-status-tag.dnf { background-color: #FFD700; }
     </style>
 </head>
 <body>
@@ -54,7 +73,14 @@
             <canvas id="trackCanvas"></canvas>
             <div id="track-message-overlay"></div>
         </div>
-        <!-- 우측 리더보드 전체 제거 -->
+        <div class="leaderboard">
+            <div class="leaderboard-header">
+                <span style="text-align: center;">Pos</span>
+                <span>Driver</span>
+                <span>Status</span>
+            </div>
+            <div id="leaderboard-body"></div>
+        </div>
     </div>
     
     <div class="timeline-controls">
@@ -69,153 +95,157 @@
 <script id="__driver_directory" type="application/json"><%- JSON.stringify(driverDirectory || {}) %></script>
 
 <script>
-    const sessioninfo = JSON.parse(document.getElementById('__session_info').textContent);
-    const driverinfo = JSON.parse(document.getElementById('__driver_directory').textContent);
+    const SESSION_INFO = JSON.parse(document.getElementById('__session_info').textContent);
+    const DRIVER_DIRECTORY = JSON.parse(document.getElementById('__driver_directory').textContent);
     const canvas = document.getElementById('trackCanvas'), ctx = canvas.getContext('2d');
-    const timeline = document.getElementById('timelineSlider'), currentTimeEl = document.getElementById('currentTime'), totalTimeEl = document.getElementById('totalTime');
-    const playbutton = document.getElementById('playPauseBtn'), messageOverlay = document.getElementById('track-message-overlay');
-    const canvassive = document.getElementById('track-container');
+    const timelineSlider = document.getElementById('timelineSlider'), currentTimeEl = document.getElementById('currentTime'), totalTimeEl = document.getElementById('totalTime');
+    const playPauseBtn = document.getElementById('playPauseBtn'), leaderboardBody = document.getElementById('leaderboard-body'), messageOverlay = document.getElementById('track-message-overlay');
+    const trackContainer = document.getElementById('track-container');
     
-    const blank = 40;
-    const racelen = 7200000;          // 세션 전체 길이(추정 2h)
-    const chunklen = 120000;
-    const laptime = 180000;        // 1랩(3분)만 미리 로드해 레이아웃/스타트 검사
-    // 필요하면 240000으로 늘려 초기 창을 4분으로 확장 가능
-
-    // ★ 레이스 스타트 보정(formation lap 스킵)
-    let RACE_START_OFFSET_MS = 0;
-
-    // Race Start/Lights Out 우선, 없으면 세션 시작 후 5분 이내 첫 GREEN만 인정
-    function getstart(raceControl) {
-      if (!Array.isArray(raceControl) || !sessioninfo?.date_start) return 0;
-      const t0 = new Date(sessioninfo.date_start).getTime();
-
-      const norm = v => String(v || '').toLowerCase();
-      const events = raceControl
-        .map(m => ({ ...m, ts: new Date(m.date).getTime(), msg: norm(m.message), flag: String(m.flag || '').toUpperCase() }))
-        .filter(m => !Number.isNaN(m.ts))
-        .sort((a, b) => a.ts - b.ts);
-
-      // (A) 명시 메시지 우선
-      const explicit = events.find(m => /race\s*start|lights?\s*out/.test(m.msg));
-      if (explicit) return Math.max(0, explicit.ts - t0);
-
-      // (B) 세션 시작 5분 이내의 첫 GREEN (SC/VSC 문구 포함이면 제외)
-      const GREEN_WINDOW_MS = 5 * 60 * 1000;
-      const green = events.find(m => {
-        const isGreen = m.flag === 'GREEN' || /green\s*flag/.test(m.msg);
-        const within = m.ts >= t0 && (m.ts - t0) <= GREEN_WINDOW_MS;
-        const isSC = /safety\s*car|virtual\s*safety\s*car|\bsc\b|\bvsc\b/.test(m.msg);
-        return isGreen && within && !isSC;
-      });
-      if (green) return Math.max(0, green.ts - t0);
-
-      return 0;
-    }
+    const PADDING = 40;
+    const raceDuration = 7200000;
+    const CHUNK_DURATION_MS = 120000;
+    const LAP_ESTIMATE_MS = 120000; // 2분으로 1랩 데이터 로드 시간 추정
     
-    let tray2 = null; 
-    let play = {
-        playing: false, t: 0, lastt: 0,
-        buf: false, bufTo: 0,
-        locs: [] // 리더보드용 positionBuffer 제거
+    let bbox = null; 
+    let playbackState = {
+        isPlaying: false, currentTimeMs: 0, lastSystemTime: 0,
+        isBuffering: false, bufferedUntilMs: 0,
+        locationBuffer: [], positionBuffer: [], carDataBuffer: [], raceControlBuffer: []
     };
-    const trackpath = new Map();
+    const trackPath = new Map();
+    const dnfDrivers = new Set();
     
-    let orient = false;
-    let algle = 0;
-    let flipx = 1;
+    let orientationCalculated = false;
+    let initialAngle = 0;
+    let flipX = 1;
 
-    const mstotime = ms => {
-      const h=String(Math.floor(ms/3600000)).padStart(2,'0'),
-            m=String(Math.floor((ms%3600000)/60000)).padStart(2,'0'),
-            s=String(Math.floor((ms%60000)/1000)).padStart(2,'0');
-      return `${h}:${m}:${s}`;
-    };
-    const show = (text) => { messageOverlay.textContent = text; messageOverlay.style.display = 'block'; };
-    const hide = () => { messageOverlay.style.display = 'none'; };
-    const rotate = (x, y, angle) => ({
+    const msToTime = ms => { const h=String(Math.floor(ms/3600000)).padStart(2,'0'),m=String(Math.floor((ms%3600000)/60000)).padStart(2,'0'),s=String(Math.floor((ms%60000)/1000)).padStart(2,'0'); return `${h}:${m}:${s}`; };
+    const showMessage = (text) => { messageOverlay.textContent = text; messageOverlay.style.display = 'block'; };
+    const hideMessage = () => { messageOverlay.style.display = 'none'; };
+    const rotatePoint = (x, y, angle) => ({
         x: x * Math.cos(angle) - y * Math.sin(angle),
         y: x * Math.sin(angle) + y * Math.cos(angle)
     });
 
-    function calculate(locations) {
+    function calculateOrientationAndBbox(locations) {
         if (!locations || locations.length < 2) return;
 
-        // 1) 주행 방향(시계/반시계) 추정
-        const driverNum = [...new Set(locations.map(p => p.driver_number))];
-        if (driverNum.length > 0) {
-            const path = locations.filter(p => p.driver_number === driverNum[0]);
+        // 1. 주행 방향 결정 (시계/반시계)
+        const driverNumbers = [...new Set(locations.map(p => p.driver_number))];
+        if (driverNumbers.length > 0) {
+            const path = locations.filter(p => p.driver_number === driverNumbers[0]);
             if (path.length > 50) {
-                const p1 = path[0], p2 = path[25], p3 = path[50];
-                const cross = (p2.x - p1.x) * (p3.y - p2.y) - (p2.y - p1.y) * (p3.x - p2.x);
-                if (cross > 0) flipx = -1;
+                const p1 = path[0];
+                const p2 = path[25];
+                const p3 = path[50];
+                const crossProduct = (p2.x - p1.x) * (p3.y - p2.y) - (p2.y - p1.y) * (p3.x - p2.x);
+                if (crossProduct > 0) {
+                    flipX = -1;
+                }
             }
         }
-        // 2) 진행 방향을 오른쪽으로 정렬
-        const point1 = locations[0];
-        const point2 = locations.find(p => p.x !== point1.x || p.y !== point1.y);
-        if (point1 && point2) {
-            const dx = (point2.x - point1.x) * flipx;
-            const dy = point2.y - point1.y;
-            algle = -Math.atan2(dy, dx);
+        
+        // 2. 출발 방향을 오른쪽으로 정렬하기 위한 각도 계산
+        const firstPoint = locations[0];
+        const secondPoint = locations.find(p => p.x !== firstPoint.x || p.y !== firstPoint.y);
+        if(firstPoint && secondPoint) {
+            const dx = (secondPoint.x - firstPoint.x) * flipX;
+            const dy = secondPoint.y - firstPoint.y;
+            initialAngle = -Math.atan2(dy, dx);
         }
 
-        // 3) 변환 후 BBox 계산
-        const tray1 = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        // 3. 전체 트랙에 대해 변환(반전, 회전)을 적용하여 최종 BBox 계산
+        const tempBbox = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
         locations.forEach(loc => {
-            const flippedX = loc.x * flipx;
-            const rotated = rotate(flippedX, loc.y, algle);
-            tray1.minX = Math.min(tray1.minX, rotated.x);
-            tray1.maxX = Math.max(tray1.maxX, rotated.x);
-            tray1.minY = Math.min(tray1.minY, rotated.y);
-            tray1.maxY = Math.max(tray1.maxY, rotated.y);
+            const flippedX = loc.x * flipX;
+            const rotated = rotatePoint(flippedX, loc.y, initialAngle);
+            tempBbox.minX = Math.min(tempBbox.minX, rotated.x);
+            tempBbox.maxX = Math.max(tempBbox.maxX, rotated.x);
+            tempBbox.minY = Math.min(tempBbox.minY, rotated.y);
+            tempBbox.maxY = Math.max(tempBbox.maxY, rotated.y);
         });
-        tray2 = tray1;
-        orient = true;
+        bbox = tempBbox;
+        orientationCalculated = true;
 
-        // 4) 트랙 비율에 맞춰 컨테이너 비율 보정(옵션)
-        const trackWidth = tray2.maxX - tray2.minX;
-        const trackHeight = tray2.maxY - tray2.minY;
+        // 4. 트랙 비율에 맞춰 컨테이너 크기 조절
+        const trackWidth = bbox.maxX - bbox.minX;
+        const trackHeight = bbox.maxY - bbox.minY;
         if (trackHeight > 0 && window.innerWidth > 900) {
-            canvassive.style.setProperty('--track-aspect-ratio', trackWidth / trackHeight);
+            trackContainer.style.setProperty('--track-aspect-ratio', trackWidth / trackHeight);
         }
     }
 
-    async function playbutton() {
-        if (play.playing) {
-            play.playing = false;
-            playbutton.textContent = '▶';
+    async function togglePlayPause() {
+        if (playbackState.isPlaying) {
+            playbackState.isPlaying = false;
+            playPauseBtn.textContent = '▶';
             return;
         }
-        play.playing = true;
-        playbutton.textContent = '❚❚';
-        play.lastt = performance.now();
+        
+        playbackState.isPlaying = true;
+        playPauseBtn.textContent = '❚❚';
+        playbackState.lastSystemTime = performance.now();
         requestAnimationFrame(gameLoop);
     }
     
     function gameLoop(now) {
-        if (!play.playing) return;
-        if (!play.lastt) play.lastt = now;
-        const deltaTime = now - play.lastt;
-        play.lastt = now;
-        play.currentTimeMs += deltaTime;
-        if (play.currentTimeMs >= racelen) {
-            play.currentTimeMs = racelen;
-            playbutton();
+        if (!playbackState.isPlaying) return;
+        if (!playbackState.lastSystemTime) playbackState.lastSystemTime = now;
+        const deltaTime = now - playbackState.lastSystemTime;
+        playbackState.lastSystemTime = now;
+        playbackState.currentTimeMs += deltaTime;
+        if (playbackState.currentTimeMs >= raceDuration) {
+            playbackState.currentTimeMs = raceDuration;
+            togglePlayPause();
         }
-        update(play.currentTimeMs);
-        if (play.playing) requestAnimationFrame(gameLoop);
+        updateUI(playbackState.currentTimeMs);
+        if (playbackState.isPlaying) {
+            requestAnimationFrame(gameLoop);
+        }
     }
     
-    function update(timeMs) {
-        // 표시(슬라이더/시간)는 레이스 스타트 기준 0부터
-        const displaytime = Math.max(0, timeMs - RACE_START_OFFSET_MS);
-        timeline.value = displaytime;
-        currentTimeEl.textContent = mstotime(displaytime);
-        draw(); // 리더보드 없음
+    function updateLeaderboard(targetTime) {
+        const latestPositions = {};
+        for (let i = playbackState.positionBuffer.length - 1; i >= 0; i--) {
+            const pos = playbackState.positionBuffer[i];
+            if (new Date(pos.date) > targetTime) continue;
+            if (!latestPositions[pos.driver_number]) {
+                latestPositions[pos.driver_number] = pos;
+            }
+        }
+        const sortedDrivers = Object.values(latestPositions).sort((a, b) => a.position - b.position);
+        leaderboardBody.innerHTML = '';
+        for (const driverPos of sortedDrivers) {
+            const driverNumber = driverPos.driver_number;
+            const driverInfo = DRIVER_DIRECTORY[driverNumber] || {};
+            const isDNF = dnfDrivers.has(Number(driverNumber));
+            const row = document.createElement('div');
+            row.className = 'leaderboard-row';
+            if (isDNF) row.classList.add('dnf');
+            row.innerHTML = `
+                <span class="pos">${driverPos.position}</span>
+                <div class="driver-name">
+                    <span class="team-color-indicator" style="background-color: ${driverInfo.team_colour || '#FFFFFF'}"></span>
+                    <span>${driverInfo.full_name || `Driver ${driverNumber}`}</span>
+                </div>
+                <div class="status">
+                    ${isDNF ? '<span class="driver-status-tag dnf">DNF</span>' : ''}
+                </div>
+            `;
+            leaderboardBody.appendChild(row);
+        }
     }
     
-    function draw() {
+    function updateUI(timeMs) {
+        timelineSlider.value = timeMs;
+        currentTimeEl.textContent = msToTime(timeMs);
+        const targetTime = new Date(new Date(SESSION_INFO.date_start).getTime() + timeMs);
+        updateLeaderboard(targetTime);
+        drawOnCanvas();
+    }
+    
+    function drawOnCanvas() {
         if (!canvas.parentElement) return;
         canvas.width = canvas.parentElement.clientWidth;
         canvas.height = canvas.parentElement.clientHeight;
@@ -224,36 +254,36 @@
         ctx.fillStyle = '#181820';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        if (!sessioninfo?.date_start || !tray2 || !orient) return;
+        if (!SESSION_INFO?.date_start || !bbox || !orientationCalculated) return;
         
-        const showDrivers = play.playing || play.currentTimeMs > 0;
-        // 실제 타깃 시간 = 세션 시작 + currentTime(절대) 
-        const targettime = new Date(new Date(sessioninfo.date_start).getTime() + play.currentTimeMs);
+        const showDrivers = playbackState.isPlaying || playbackState.currentTimeMs > 0;
+        const targetTime = new Date(new Date(SESSION_INFO.date_start).getTime() + playbackState.currentTimeMs);
         
-        // 스케일/오프셋 계산
-        const trackW = tray2.maxX - tray2.minX;
-        const trackH = tray2.maxY - tray2.minY;
-        const canvasDrawableWidth = canvas.width - (blank * 2);
-        const canvasDrawableHeight = canvas.height - (blank * 2);
-        const scaleX = trackW > 0 ? canvasDrawableWidth / trackW : 1;
-        const scaleY = trackH > 0 ? canvasDrawableHeight / trackH : 1;
+        const trackWidth = bbox.maxX - bbox.minX;
+        const trackHeight = bbox.maxY - bbox.minY;
+        const canvasDrawableWidth = canvas.width - (PADDING * 2);
+        const canvasDrawableHeight = canvas.height - (PADDING * 2);
+        const scaleX = trackWidth > 0 ? canvasDrawableWidth / trackWidth : 1;
+        const scaleY = trackHeight > 0 ? canvasDrawableHeight / trackHeight : 1;
         const scale = Math.min(scaleX, scaleY);
 
-        const trackCenterX = (tray2.minX + tray2.maxX) / 2;
-        const trackCenterY = (tray2.minY + tray2.maxY) / 2;
+        const trackCenterX = (bbox.minX + bbox.maxX) / 2;
+        const trackCenterY = (bbox.minY + bbox.maxY) / 2;
         const offsetX = (canvas.width / 2) - (trackCenterX * scale);
         const offsetY = (canvas.height / 2) + (trackCenterY * scale);
 
         const transform = (x, y) => {
-            const flippedX = x * flipx;
-            const rotated = rotate(flippedX, y, algle);
-            return { x: rotated.x * scale + offsetX, y: -rotated.y * scale + offsetY };
+            const flippedX = x * flipX;
+            const rotated = rotatePoint(flippedX, y, initialAngle);
+            return { 
+                x: rotated.x * scale + offsetX, 
+                y: -rotated.y * scale + offsetY 
+            };
         };
 
-        // 트랙 라인
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.lineWidth = 5;
-        trackpath.forEach((path) => {
+        trackPath.forEach((path) => {
             if (path.length > 1) {
                 ctx.beginPath();
                 const startPoint = transform(path[0].x, path[0].y);
@@ -266,22 +296,26 @@
             }
         });
         
-        // 차량
         if (showDrivers) {
-            const latestloc = {};
-            for (let i = play.locsamp.length - 1; i >= 0; i--) {
-                const loc = play.locsamp[i];
-                if (new Date(loc.date) > targettime) continue;
-                if (!latestloc[loc.driver_number]) latestloc[loc.driver_number] = loc;
+            const latestLocations = {};
+            for (let i = playbackState.locationBuffer.length - 1; i >= 0; i--) {
+                const loc = playbackState.locationBuffer[i];
+                if (new Date(loc.date) > targetTime) continue;
+                if (!latestLocations[loc.driver_number]) {
+                    latestLocations[loc.driver_number] = loc;
+                }
             }
-            for (const driverNumber in latestloc) {
-                const pos = latestloc[driverNumber];
-                const driverInfo = driverinfo[driverNumber] || {};
-                const { x: cx, y: cy } = transform(pos.x, pos.y);
-                const r = 11;
+
+            for (const driverNumber in latestLocations) {
+                if (dnfDrivers.has(Number(driverNumber))) continue;
+                
+                const pos = latestLocations[driverNumber];
+                const driverInfo = DRIVER_DIRECTORY[driverNumber] || {};
+                const { x: canvasX, y: canvasY } = transform(pos.x, pos.y);
+                const circleRadius = 11;
 
                 ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.arc(canvasX, canvasY, circleRadius, 0, 2 * Math.PI);
                 ctx.fillStyle = driverInfo.team_colour || '#FFFFFF';
                 ctx.fill();
                 ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
@@ -293,104 +327,88 @@
                 ctx.textBaseline = 'middle';
                 ctx.strokeStyle = 'black';
                 ctx.lineWidth = 2;
-                ctx.strokeText(driverNumber, cx, cy);
+                ctx.strokeText(driverNumber, canvasX, canvasY);
                 ctx.fillStyle = 'white';
-                ctx.fillText(driverNumber, cx, cy);
+                ctx.fillText(driverNumber, canvasX, canvasY);
             }
         }
     }
 
     async function initialize() {
-        if (!sessioninfo) return show("세션 정보를 불러올 수 없습니다.");
+        if (!SESSION_INFO) return showMessage("세션 정보를 불러올 수 없습니다.");
         
-        // 초기엔 전체 길이를 표시(오프셋 계산 후 다시 보정)
-        timeline.max = racelen;
-        totalTimeEl.textContent = mstotime(racelen);
-        playbutton.addEventListener('click', playbutton);
-        playbutton.disabled = true;
-        timeline.disabled = true;
-
-        // 슬라이더로 시킹 가능 (표시값 + 오프셋 = 절대 시간)
-        timeline.addEventListener('input', () => {
-          play.currentTimeMs = RACE_START_OFFSET_MS + Number(timeline.value);
-          update(play.currentTimeMs);
-        });
+        timelineSlider.max = raceDuration;
+        totalTimeEl.textContent = msToTime(raceDuration);
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        playPauseBtn.disabled = true;
+        timelineSlider.disabled = true;
         
         window.addEventListener('resize', resizeCanvas);
         
-        let lap1 = [];
-        let bufto = 0;
+        let firstLapLocations = [];
+        let bufferedUntilMs = 0;
         let success = true;
 
-        // 1랩 데이터만 먼저 로드 + race_control에서 스타트 오프셋 탐색
-        show('트랙 레이아웃 분석 중...');
-        while (bufto < laptime && success) {
-            const starttime = new Date(sessioninfo.date_start);
-            const chunkstart = bufto;
-            const chunkend = Math.min(chunkstart + chunklen, laptime);
-            const chunkstartT = new Date(starttime.getTime() + chunkstart).toISOString();
-            const chunkendT = new Date(starttime.getTime() + chunkend).toISOString();
+        // --- 수정된 부분: 1랩 데이터만 먼저 로드 ---
+        showMessage('트랙 레이아웃 분석 중...');
+        
+        while (bufferedUntilMs < LAP_ESTIMATE_MS && success) {
+            const startTime = new Date(SESSION_INFO.date_start);
+            const chunkStartMs = bufferedUntilMs;
+            const chunkEndMs = Math.min(chunkStartMs + CHUNK_DURATION_MS, LAP_ESTIMATE_MS);
+            const chunkStartTime = new Date(startTime.getTime() + chunkStartMs).toISOString();
+            const chunkEndTime = new Date(startTime.getTime() + chunkEndMs).toISOString();
 
             try {
-                const res = await fetch(`/api/locations/<%= session_key %>/${chunkstartT}/${chunkendT}`);
-                const data = await res.json();
+                const response = await fetch(`/api/locations/<%= session_key %>/${chunkStartTime}/${chunkEndTime}`);
+                const data = await response.json();
                 if (data.error) throw new Error(data.error);
 
-                if (bufto === 0 && (!data.locations || data.locations.length === 0)) {
+                if (bufferedUntilMs === 0 && (!data.locations || data.locations.length === 0)) {
                     throw new Error("이 경기에 대한 주행 데이터가 없습니다.");
                 }
 
-                if (data.locations) lap1.push(...data.locations);
-                // formation lap 스킵: race_control로 레이스 스타트 시각 찾기(최초 청크에서 발견되면 바로 기록)
-                if (Array.isArray(data.race_control) && RACE_START_OFFSET_MS === 0) {
-                  const off = getstart(data.race_control); // ← start(...) 제거
-                  if (off > 0) {
-                    console.debug('[RaceStartOffset]', off, 'ms');
-                    RACE_START_OFFSET_MS = off;
-                  }
+                if (data.locations) firstLapLocations.push(...data.locations);
+                if (data.positions) playbackState.positionBuffer.push(...data.positions);
+                if (data.race_control) {
+                     playbackState.raceControlBuffer.push(...data.race_control);
+                    data.race_control.forEach(msg => {
+                        if (msg.category === 'Retirement' && msg.driver_number) dnfDrivers.add(msg.driver_number);
+                    });
                 }
-
-                bufto = chunkend;
+                
+                bufferedUntilMs = chunkEndMs;
             } catch (error) {
                 console.error('데이터 로딩 실패:', error);
-                show(error.message.includes('주행 데이터') ? error.message : `오류가 발생했습니다: ${error.message}`);
+                showMessage(error.message.includes('주행 데이터') ? error.message : `오류가 발생했습니다: ${error.message}`);
                 success = false;
             }
         }
         
         if (success) {
-            hide();
-            play.locsamp = lap1;
+            hideMessage();
+            playbackState.locationBuffer = firstLapLocations;
             
-            // 트랙 궤적 생성
-            lap1.forEach(loc => {
-                const dn = loc.driver_number;
-                if (!trackpath.has(dn)) trackpath.set(dn, []);
-                trackpath.get(dn).push({ x: loc.x, y: loc.y });
+            firstLapLocations.forEach(loc => {
+                const driverNum = loc.driver_number;
+                if (!trackPath.has(driverNum)) trackPath.set(driverNum, []);
+                trackPath.get(driverNum).push({ x: loc.x, y: loc.y });
             });
 
-            calculate(lap1);
+            calculateOrientationAndBbox(firstLapLocations);
             
-            // ▶ 포메이션 랩 스킵: 시작 시간을 레이스 스타트로 이동
-            play.currentTimeMs = Math.max(play.currentTimeMs, RACE_START_OFFSET_MS);
-            // 표시/슬라이더 범위도 스타트 기준으로 재설정
-            timeline.max = Math.max(0, racelen - RACE_START_OFFSET_MS);
-            timeline.value = 0; // 화면상 0 = 레이스 스타트
-            currentTimeEl.textContent = mstotime(0);
-            totalTimeEl.textContent = mstotime(Number(timeline.max));
-
-            playbutton.disabled = false;
-            timeline.disabled = false;
+            playPauseBtn.disabled = false;
+            timelineSlider.disabled = false;
             
             resizeCanvas();
         }
     }
 
     function resizeCanvas() { 
-        if (canvassive) {
-            canvas.width = canvassive.clientWidth;
-            canvas.height = canvassive.clientHeight;
-            draw(); 
+        if (trackContainer) {
+            canvas.width = trackContainer.clientWidth;
+            canvas.height = trackContainer.clientHeight;
+            drawOnCanvas(); 
         }
     }
     
