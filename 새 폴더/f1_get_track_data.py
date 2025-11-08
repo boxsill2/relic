@@ -5,74 +5,68 @@ import requests
 import pandas as pd
 import time
 
-API_BASE = "https://api.openf1.org/v1"
+apiurl = "https://api.openf1.org/v1"
 
-def fetch_api(endpoint, params):
+def api(endpoint, a):
     try:
-        url = f"{API_BASE}/{endpoint}"
-        response = requests.get(url, params=params, timeout=600)
+        url = f"{apiurl}/{endpoint}"
+        response = requests.get(url, params=a, timeout=600)
         response.raise_for_status()
-        time.sleep(1)
+        time.sleep(1)  # API 예절상 대기
         return response.json()
     except requests.RequestException as e:
         return {"error": f"API fetching failed for {endpoint}: {str(e)}"}
 
-def process_data(session_key, locations, laps, positions):
-    if "error" in locations or "error" in laps or "error" in positions:
-        return {"session_key": session_key, "error": "API에서 중요 데이터를 가져오는 데 실패했습니다."}
+def  error(session_key, locations):
+    # 에러 응답 가드
+    if isinstance(locations, dict) and "error" in locations:
+        return {"session_key": session_key, "error": "현재 F1 경기가 진행하고 있으므로 데이터를 가져올 수 없습니다."}
 
-    df_loc = pd.DataFrame(locations)
-    df_laps = pd.DataFrame(laps)
-    df_pos = pd.DataFrame(positions)
+    # DataFrame 변환 및 시간 파싱
+    loc = pd.DataFrame(locations)
+    if 'date' in loc.columns:
+        loc['date'] = pd.to_datetime(loc['date'])
 
-    for df in [df_loc, df_laps, df_pos]:
-        if 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date'])
-
-    frames_map = {}
-    for _, row in df_loc.iterrows():
+    
+    frames = {}
+    for _, row in loc.iterrows():
         ts = row['date']
         ts_ms = int(ts.timestamp() * 1000)
-        frame = frames_map.setdefault(ts_ms, {"t": ts_ms, "positions": [], "driver_standings": {}})
-        frame["positions"].append({
-            "driver_number": row['driver_number'],
-            "x": row['x'], "y": row['y']
+        screen = frames.setdefault(ts_ms, {"t": ts_ms, "positions": [], "driver_standings": {}})
+        screen["positions"].append({
+            "driver_number": row.get('driver_number'),
+            "x": row.get('x'),
+            "y": row.get('y')
         })
 
-    df_pos_sorted = df_pos.sort_values('date')
-    for ts_ms, frame in sorted(frames_map.items()):
-        current_time = pd.to_datetime(ts_ms, unit='ms')
-        latest_pos = df_pos_sorted[df_pos_sorted['date'] <= current_time]
-        if not latest_pos.empty:
-            standings = latest_pos.groupby('driver_number')['position'].last().to_dict()
-            frame['driver_standings'] = standings
-
-    frames = sorted(frames_map.values(), key=lambda f: f['t'])
+    # 정렬 및 검증
+    frames = sorted(frames.values(), key=lambda f: f['t'])
     if not frames:
         return {"session_key": session_key, "error": "처리할 유효한 프레임이 없습니다."}
 
-    all_x = [p["x"] for f in frames for p in f["positions"]]
-    all_y = [p["y"] for f in frames for p in f["positions"]]
-    bbox = {"minX": min(all_x), "maxX": max(all_x), "minY": min(all_y), "maxY": max(all_y)} if all_x else None
-    
-    duration_ms = frames[-1]['t'] - frames[0]['t']
+    X = [p["x"] for f in frames for p in f["positions"] if p.get("x") is not None]
+    Y = [p["y"] for f in frames for p in f["positions"] if p.get("y") is not None]
+    screen = {"minX": min(X), "maxX": max(X), "minY": min(Y), "maxY": max(Y)} if X and Y else None
 
-    return {"session_key": session_key, "duration_ms": duration_ms, "bbox": bbox, "frames": frames}
+    # 재생 구간(ms)
+    ms = frames[-1]['t'] - frames[0]['t']
+
+    return {"session_key": session_key, "duration_ms": ms, "bbox": screen, "frames": frames}
 
 def main():
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "session_key 인자가 필요합니다."}))
+        print(json.dumps({"error": "session_key 인자가 필요합니다."}, ensure_ascii=False))
         sys.exit(1)
+
     session_key = sys.argv[1]
-    
-    params = {"session_key": session_key}
-    locations = fetch_api("location", params)
-    laps = fetch_api("laps", params)
-    positions = fetch_api("position", params)
-    
-    replay_data = process_data(session_key, locations, laps, positions)
-    
-    print(json.dumps(replay_data, ensure_ascii=False))
+    a = {"session_key": session_key}
+
+    # /location 만 호출
+    loc = api("location", a)
+
+    replay = process_data(session_key, loc)
+
+    print(json.dumps(replay, ensure_ascii=False))
 
 if __name__ == "__main__":
     main()

@@ -3,7 +3,7 @@ import requests
 import json
 import sys
 
-def get_schedule(year):
+def schedule(year):
     """지정된 연도의 모든 'Race' 세션 정보를 가져옵니다."""
     try:
         url = f"https://api.openf1.org/v1/sessions?year={year}&session_name=Race"
@@ -36,13 +36,13 @@ def get_schedule(year):
         print(json.dumps([{"error": f"API 요청 실패: {e}"}]))
 
 if __name__ == "__main__":
-    target_year = 2025
+    year = 2025
     if len(sys.argv) > 1:
         try:
-            target_year = int(sys.argv[1])
+            year = int(sys.argv[1])
         except ValueError:
             print("[오류] 연도를 숫자로 입력해주세요. 예: python f1_get_gp_list.py 2025")
             sys.exit(1)
     
-    print(f"{target_year}년 시즌 경기 목록을 가져옵니다...")
-    get_schedule(target_year)
+    print(f"{year}년 시즌 경기 목록을 가져옵니다...")
+    schedule(year)
