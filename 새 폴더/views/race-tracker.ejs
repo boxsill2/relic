@@ -92,25 +92,25 @@
     const SESSION_INFO = JSON.parse(document.getElementById('__session_info').textContent);
     const DRIVER_DIRECTORY = JSON.parse(document.getElementById('__driver_directory').textContent);
     const canvas = document.getElementById('trackCanvas'), ctx = canvas.getContext('2d');
-    const timeslide = document.getElementById('timelineSlider'), currentTimeEl = document.getElementById('currentTime'), totalt = document.getElementById('totalTime');
+    const timelineSlider = document.getElementById('timelineSlider'), currentTimeEl = document.getElementById('currentTime'), totalTimeEl = document.getElementById('totalTime');
     const playPauseBtn = document.getElementById('playPauseBtn'), leaderboardBody = document.getElementById('leaderboard-body'), messageOverlay = document.getElementById('track-message-overlay');
-    const tracstyle = document.getElementById('track-container');
+    const trackContainer = document.getElementById('track-container');
     
     const blank = 40;
-    const racelen= 7200000;
-    const datams = 180000
-    const lapms = 180000; // 3분으로 1랩 데이터 로드 시간 추정
+    const raceDuration = 7200000;
+    const CHUNK_DURATION_MS = 120000;
+    const LAP_ESTIMATE_MS = 180000; // 3분으로 1랩 데이터 로드 시간 추정
     
-    let screen = null; 
-    let play = {
-        playing: false, currentTimeMs: 0, lastSystemTime: 0,
-        loding: false, bufferedUntilMs: 0,
-        locloding: [], positionBuffer: [], carDataBuffer: [], raceControlBuffer: []
+    let bbox = null; 
+    let playbackState = {
+        isPlaying: false, currentTimeMs: 0, lastSystemTime: 0,
+        isBuffering: false, bufferedUntilMs: 0,
+        locationBuffer: [], positionBuffer: [], carDataBuffer: [], raceControlBuffer: []
     };
     const trackPath = new Map();
     const dnfDrivers = new Set();
     
-    let trackload = false;
+    let orientationCalculated = false;
     let initialAngle = 0;
     let flipX = 1;
 
@@ -150,59 +150,59 @@
         }
 
         // 3. 전체 트랙에 대해 변환(반전, 회전)을 적용하여 최종 BBox 계산
-        const screen2 = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        const tempBbox = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
         locations.forEach(loc => {
             const flippedX = loc.x * flipX;
             const rotated = rotatePoint(flippedX, loc.y, initialAngle);
-            screen2.minX = Math.min(screen2.minX, rotated.x);
-            screen2.maxX = Math.max(screen2.maxX, rotated.x);
-            screen2.minY = Math.min(screen2.minY, rotated.y);
-            screen2.maxY = Math.max(screen2.maxY, rotated.y);
+            tempBbox.minX = Math.min(tempBbox.minX, rotated.x);
+            tempBbox.maxX = Math.max(tempBbox.maxX, rotated.x);
+            tempBbox.minY = Math.min(tempBbox.minY, rotated.y);
+            tempBbox.maxY = Math.max(tempBbox.maxY, rotated.y);
         });
-        screen = screen2;
-        trackload = true;
+        bbox = tempBbox;
+        orientationCalculated = true;
 
         // 4. 트랙 비율에 맞춰 컨테이너 크기 조절
-        const trackW = screen.maxX - screen.minX;
-        const trackH = screen.maxY - screen.minY;
-        if (trackH > 0 && window.innerWidth > 900) {
-            tracstyle.style.setProperty('--track-aspect-ratio', trackW / trackH);
+        const trackWidth = bbox.maxX - bbox.minX;
+        const trackHeight = bbox.maxY - bbox.minY;
+        if (trackHeight > 0 && window.innerWidth > 900) {
+            trackContainer.style.setProperty('--track-aspect-ratio', trackWidth / trackHeight);
         }
     }
 
     async function togglePlayPause() {
-        if (play.playing) {
-            play.playing = false;
+        if (playbackState.isPlaying) {
+            playbackState.isPlaying = false;
             playPauseBtn.textContent = '▶';
             return;
         }
         
-        play.playing = true;
+        playbackState.isPlaying = true;
         playPauseBtn.textContent = '❚❚';
-        play.lastSystemTime = performance.now();
+        playbackState.lastSystemTime = performance.now();
         requestAnimationFrame(gameLoop);
     }
     
     function gameLoop(now) {
-        if (!play.playing) return;
-        if (!play.lastSystemTime) play.lastSystemTime = now;
-        const deltaTime = now - play.lastSystemTime;
-        play.lastSystemTime = now;
-        play.currentTimeMs += deltaTime;
-        if (play.currentTimeMs >= racelenn) {
-            play.currentTimeMs = racelenn;
+        if (!playbackState.isPlaying) return;
+        if (!playbackState.lastSystemTime) playbackState.lastSystemTime = now;
+        const deltaTime = now - playbackState.lastSystemTime;
+        playbackState.lastSystemTime = now;
+        playbackState.currentTimeMs += deltaTime;
+        if (playbackState.currentTimeMs >= raceDuration) {
+            playbackState.currentTimeMs = raceDuration;
             togglePlayPause();
         }
-        updateUI(play.currentTimeMs);
-        if (play.playing) {
+        updateUI(playbackState.currentTimeMs);
+        if (playbackState.isPlaying) {
             requestAnimationFrame(gameLoop);
         }
     }
     
     function updateLeaderboard(targetTime) {
         const latestPositions = {};
-        for (let i = play.positionBuffer.length - 1; i >= 0; i--) {
-            const pos = play.positionBuffer[i];
+        for (let i = playbackState.positionBuffer.length - 1; i >= 0; i--) {
+            const pos = playbackState.positionBuffer[i];
             if (new Date(pos.date) > targetTime) continue;
             if (!latestPositions[pos.driver_number]) {
                 latestPositions[pos.driver_number] = pos;
@@ -232,7 +232,7 @@
     }
     
     function updateUI(timeMs) {
-        timeslide.value = timeMs;
+        timelineSlider.value = timeMs;
         currentTimeEl.textContent = msToTime(timeMs);
         const targetTime = new Date(new Date(SESSION_INFO.date_start).getTime() + timeMs);
         updateLeaderboard(targetTime);
@@ -248,21 +248,21 @@
         ctx.fillStyle = '#181820';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        if (!SESSION_INFO?.date_start || !screen || !trackload) return;
+        if (!SESSION_INFO?.date_start || !bbox || !orientationCalculated) return;
         
-        const showDrivers = play.playing || play.currentTimeMs > 0;
-        const targetTime = new Date(new Date(SESSION_INFO.date_start).getTime() + play.currentTimeMs);
+        const showDrivers = playbackState.isPlaying || playbackState.currentTimeMs > 0;
+        const targetTime = new Date(new Date(SESSION_INFO.date_start).getTime() + playbackState.currentTimeMs);
         
-        const trackWidth = screen.maxX - screen.minX;
-        const trackHeight = screen.maxY - screen.minY;
+        const trackWidth = bbox.maxX - bbox.minX;
+        const trackHeight = bbox.maxY - bbox.minY;
         const canvasDrawableWidth = canvas.width - (blank * 2);
         const canvasDrawableHeight = canvas.height - (blank * 2);
         const scaleX = trackWidth > 0 ? canvasDrawableWidth / trackWidth : 1;
         const scaleY = trackHeight > 0 ? canvasDrawableHeight / trackHeight : 1;
         const scale = Math.min(scaleX, scaleY);
 
-        const trackCenterX = (screen.minX + screen.maxX) / 2;
-        const trackCenterY = (screen.minY + screen.maxY) / 2;
+        const trackCenterX = (bbox.minX + bbox.maxX) / 2;
+        const trackCenterY = (bbox.minY + bbox.maxY) / 2;
         const offsetX = (canvas.width / 2) - (trackCenterX * scale);
         const offsetY = (canvas.height / 2) + (trackCenterY * scale);
 
@@ -291,20 +291,20 @@
         });
         
         if (showDrivers) {
-            const lastloc = {};
-            for (let i = play.locloding.length - 1; i >= 0; i--) {
-                const loc = play.locloding[i];
+            const latestLocations = {};
+            for (let i = playbackState.locationBuffer.length - 1; i >= 0; i--) {
+                const loc = playbackState.locationBuffer[i];
                 if (new Date(loc.date) > targetTime) continue;
-                if (!lastloc[loc.driver_number]) {
-                    lastloc[loc.driver_number] = loc;
+                if (!latestLocations[loc.driver_number]) {
+                    latestLocations[loc.driver_number] = loc;
                 }
             }
 
-            for (const drivernum in lastloc) {
-                if (dnfDrivers.has(Number(drivernum))) continue;
+            for (const driverNumber in latestLocations) {
+                if (dnfDrivers.has(Number(driverNumber))) continue;
                 
-                const pos = lastloc[drivernum];
-                const driverInfo = DRIVER_DIRECTORY[drivernum] || {};
+                const pos = latestLocations[driverNumber];
+                const driverInfo = DRIVER_DIRECTORY[driverNumber] || {};
                 const { x: canvasX, y: canvasY } = transform(pos.x, pos.y);
                 const circleRadius = 11;
 
@@ -321,9 +321,9 @@
                 ctx.textBaseline = 'middle';
                 ctx.strokeStyle = 'black';
                 ctx.lineWidth = 2;
-                ctx.strokeText(drivernum, canvasX, canvasY);
+                ctx.strokeText(driverNumber, canvasX, canvasY);
                 ctx.fillStyle = 'white';
-                ctx.fillText(drivernum, canvasX, canvasY);
+                ctx.fillText(driverNumber, canvasX, canvasY);
             }
         }
     }
@@ -331,11 +331,11 @@
     async function initialize() {
         if (!SESSION_INFO) return showMessage("세션 정보를 불러올 수 없습니다.");
         
-        timeslide.max = racelenn;
-        totalt.textContent = msToTime(racelenn);
+        timelineSlider.max = raceDuration;
+        totalTimeEl.textContent = msToTime(raceDuration);
         playPauseBtn.addEventListener('click', togglePlayPause);
         playPauseBtn.disabled = true;
-        timeslide.disabled = true;
+        timelineSlider.disabled = true;
         
         window.addEventListener('resize', resizeCanvas);
         
@@ -346,10 +346,10 @@
         // --- 수정된 부분: 1랩 데이터만 먼저 로드 ---
         showMessage('트랙 레이아웃 분석 중...');
         
-        while (bufferedUntilMs < lapms && success) {
+        while (bufferedUntilMs < LAP_ESTIMATE_MS && success) {
             const startTime = new Date(SESSION_INFO.date_start);
             const chunkStartMs = bufferedUntilMs;
-            const chunkEndMs = Math.min(chunkStartMs + datams, lapms);
+            const chunkEndMs = Math.min(chunkStartMs + CHUNK_DURATION_MS, LAP_ESTIMATE_MS);
             const chunkStartTime = new Date(startTime.getTime() + chunkStartMs).toISOString();
             const chunkEndTime = new Date(startTime.getTime() + chunkEndMs).toISOString();
 
@@ -359,13 +359,13 @@
                 if (data.error) throw new Error(data.error);
 
                 if (bufferedUntilMs === 0 && (!data.locations || data.locations.length === 0)) {
-                    throw new Error("이 경기에 대한 주행 데이터가 없습니다.");
+                    throw new Error("현재 경기가 진행중입니다. 경기중에는 리플레이가 작동하지 않습니다.");
                 }
 
                 if (data.locations) firstLapLocations.push(...data.locations);
-                if (data.positions) play.positionBuffer.push(...data.positions);
+                if (data.positions) playbackState.positionBuffer.push(...data.positions);
                 if (data.race_control) {
-                     play.raceControlBuffer.push(...data.race_control);
+                     playbackState.raceControlBuffer.push(...data.race_control);
                     data.race_control.forEach(msg => {
                         if (msg.category === 'Retirement' && msg.driver_number) dnfDrivers.add(msg.driver_number);
                     });
@@ -381,7 +381,7 @@
         
         if (success) {
             hideMessage();
-            play.locloding = firstLapLocations;
+            playbackState.locationBuffer = firstLapLocations;
             
             firstLapLocations.forEach(loc => {
                 const driverNum = loc.driver_number;
@@ -392,16 +392,16 @@
             calculateOrientationAndBbox(firstLapLocations);
             
             playPauseBtn.disabled = false;
-            timeslide.disabled = false;
+            timelineSlider.disabled = false;
             
             resizeCanvas();
         }
     }
 
     function resizeCanvas() { 
-        if (tracstyle) {
-            canvas.width = tracstyle.clientWidth;
-            canvas.height = tracstyle.clientHeight;
+        if (trackContainer) {
+            canvas.width = trackContainer.clientWidth;
+            canvas.height = trackContainer.clientHeight;
             drawOnCanvas(); 
         }
     }

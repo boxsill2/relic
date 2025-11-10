@@ -9,16 +9,57 @@
   <link rel="stylesheet" href="/css/driver-style.css?v=f1" />
   <style>
     .driver-description {
-      opacity: 0.9;
+      opacity: .9;
       line-height: 1.6;
       margin: 12px 0;
       font-size: 14px;
-      white-space: pre-wrap; /* \n 줄바꿈 적용 */
+      white-space: pre-wrap;
+    }
+
+    /* --- 영상 섹션 --- */
+    .video-section { margin-top: 28px; }
+    .video-section h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+      font-weight: 900;
+    }
+    .yt-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    @media (max-width: 1024px) { .yt-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 680px)  { .yt-grid { grid-template-columns: 1fr; } }
+
+    .video-card {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      aspect-ratio: 16/9;
+    }
+    .video-card[data-portrait="1"] { aspect-ratio: 9/16; } /* 쇼츠(세로) */
+
+    .thumb-link, .embed-wrap { display: block; width: 100%; height: 100%; }
+    .thumb-link img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      opacity: .95;
+    }
+    .play-badge {
+      position: absolute; right: 10px; bottom: 10px;
+      background: rgba(0,0,0,.6);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 999px;
+      padding: 6px 10px; font-weight: 800; font-size: 14px;
+    }
+    .embed-wrap iframe {
+      width: 100%; height: 100%; border: 0; display: block;
     }
   </style>
 </head>
 <body class="theme-f1 driver-detail-page">
-  <%# include('partials/header', { currentPage:'drivers' }) %> <%# 헤더는 계속 주석 처리 상태 유지 (나중에 필요시 해제) %>
+  <%# include('partials/header', { currentPage:'drivers' }) %>
 
   <main class="container">
     <section class="page-header">
@@ -33,11 +74,12 @@
       <section class="driver-hero">
         <div class="driver-photo driver-photo--full">
           <% if (driver.photo_src) { %>
-            <img src="<%= driver.photo_src %>" alt="<%= driver.full_name %>"
+            <img src="<%= driver.photo_src %>"
+                 alt="<%= driver.full_name %>"
                  loading="lazy" decoding="async"
                  onerror="this.remove()" />
           <% } else { %>
-            <div class="avatar-fallback"><%= driver.full_name?.split(' ').map(n => n[0]).join('') %></div>
+            <div class="avatar-fallback"><%= (driver.full_name || 'DR').split(' ').map(n => n[0]).join('') %></div>
           <% } %>
         </div>
 
@@ -59,10 +101,9 @@
         </div>
       </section>
 
-      <%# --- >>> 스탯 섹션 시작 (주석 해제됨) <<< --- %>
-      <% if (driver.stats && (driver.stats.season || driver.stats.career)) { %> <%# stats 데이터가 있는지 확인 %>
+      <% if (driver.stats && (driver.stats.season || driver.stats.career)) { %>
       <section class="stats-wrap">
-        <% if (driver.stats.season) { %> <%# 시즌 데이터가 있을 때만 표시 %>
+        <% if (driver.stats.season) { %>
         <article class="stats-card">
           <h3><%= new Date().getFullYear() %> 시즌</h3>
           <ul class="stat-list">
@@ -77,7 +118,7 @@
         </article>
         <% } %>
 
-        <% if (driver.stats.career) { %> <%# 커리어 데이터가 있을 때만 표시 %>
+        <% if (driver.stats.career) { %>
         <article class="stats-card">
           <h3>커리어 통계</h3>
           <ul class="stat-list">
@@ -94,9 +135,67 @@
         <% } %>
       </section>
       <% } %>
-      <%# --- >>> 스탯 섹션 끝 (주석 해제됨) <<< --- %>
 
-    <% } %> <%# if (driver) 끝 %>
+      <% if ((videos || []).length) { %>
+      <section class="video-section">
+        <h2>Highlights</h2>
+        <div class="yt-grid">
+          <% videos.forEach((v, idx) => { %>
+            <div class="video-card" data-idx="<%= idx %>" <%= v.isPortrait ? 'data-portrait="1"' : '' %>>
+              <a href="<%= v.watch %>" class="thumb-link" target="_blank" rel="noopener" aria-label="Open on YouTube">
+                <img src="<%= v.thumb %>" alt="Video thumbnail" loading="lazy"/>
+                <span class="play-badge">▶</span>
+              </a>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+      <% } %>
+    <% } %>
   </main>
+
+  <% if ((videos || []).length) { %>
+  <script>
+    // 썸네일 클릭 시, 같은 카드를 iframe 임베드로 교체(인페이지 미리보기)
+    (function(){
+      const cards = document.querySelectorAll('.video-card');
+      if (!cards.length) return;
+      // 서버에서 videos를 직접 넘기지 않는 경우를 대비해 data-embed를 세팅할 수도 있으나
+      // 여기서는 썸네일 a.href(watch URL) → embed URL로 교체 로직을 단순화
+      cards.forEach((card) => {
+        const link = card.querySelector('.thumb-link');
+        if (!link) return;
+
+        link.addEventListener('click', (e) => {
+          // 새 탭 이동 대신 페이지 내 임베드로 교체
+          e.preventDefault();
+
+          const href = link.getAttribute('href') || '';
+          // 영상 id 추출
+          const mPlaylist = href.match(/[?&]list=([A-Za-z0-9_-]{10,})/);
+          const mId = href.match(/(?:v=|\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{6,})/);
+
+          let embedSrc = '';
+          if (mPlaylist) {
+            embedSrc = `https://www.youtube-nocookie.com/embed/videoseries?list=${mPlaylist[1]}`;
+          } else if (mId) {
+            embedSrc = `https://www.youtube-nocookie.com/embed/${mId[1]}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
+          } else {
+            // 패턴 못 찾으면 그냥 새 탭으로
+            window.open(href, '_blank', 'noopener');
+            return;
+          }
+
+          const wrap = document.createElement('div');
+          wrap.className = 'embed-wrap';
+          wrap.innerHTML = `<iframe src="${embedSrc}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+
+          card.innerHTML = '';
+          card.appendChild(wrap);
+        }, { passive: false });
+      });
+    })();
+  </script>
+  <% } %>
 </body>
 </html>

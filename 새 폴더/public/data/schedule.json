@@ -1,5 +1,13 @@
 [
   {
+    "session_key": 9869,
+    "session_name": "Race",
+    "meeting_name": "São Paulo",
+    "country_name": "Brazil",
+    "date_start": "2025-11-09T17:00:00+00:00",
+    "date_end": "2025-11-09T19:00:00+00:00"
+  },
+  {
     "session_key": 9877,
     "session_name": "Race",
     "meeting_name": "Mexico City",

@@ -11,20 +11,20 @@
     "team_colour": "#FF8000"
   },
   "season": {
-    "gp_races": 20,
-    "gp_points": 342.0,
-    "gp_podiums": 16,
-    "gp_top10": 18,
+    "gp_races": 21,
+    "gp_points": 367.0,
+    "gp_podiums": 17,
+    "gp_top10": 19,
     "dnfs": 2,
     "season_position": "1",
-    "season_points": "357"
+    "season_points": "390"
   },
   "career": {
     "gp_entered": 100,
     "career_points": 567.0,
     "podiums": 12,
     "dnfs": 13,
-    "poles": 10,
+    "poles": 11,
     "best_finish": 2,
     "best_grid": 1,
     "titles": 1

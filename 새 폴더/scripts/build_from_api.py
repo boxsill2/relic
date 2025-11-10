@@ -7,18 +7,14 @@ import time
 
 # --- CONFIG ---
 
-
-
 jolpiurl = "https://api.jolpi.ca/ergast/f1"
-
-
 openf1url = "https://api.openf1.org/v1"
 
 outresult1 = "public/data/stats"
 outresult2 = "public/data"
 
 schedulefile = "public/data/schedule.json"
-year = 2025 
+year = 2025
 
 teamcolor = "f1_team.json"
 
@@ -34,9 +30,7 @@ namefix = {
     "Nico Hülkenberg": "Nico Hulkenberg"
 }
 
-
-def getrequest(url, retries=3, delay=10):
-
+def getrequest(url, retries=3, delay=30):
     for i in range(retries):
         try:
             response = requests.get(url)
@@ -75,15 +69,16 @@ def getdriver():
         if fullname in namefix:
             fullname = namefix[fullname]
 
-        slug = slug(fullname)
+        # ⬇︎ 함수명(slug)과 겹치지 않도록 지역변수명을 slugstr로 변경
+        slugstr = slug(fullname)
         if d['driverId'] in slugfix:
-            slug = slugfix[d['driverId']]
+            slugstr = slugfix[d['driverId']]
 
         drivernum = d.get('permanentNumber', '')
 
         driverinfo = {
             "driverId": d['driverId'],
-            "slug": slug,
+            "slug": slugstr,
             "full_name": fullname,
             "number": drivernum,
             "code": d.get('code', ''),
@@ -206,13 +201,16 @@ def drivercareer(driver_id):
     return careerstats
 
 # OpenF1에서 Race 세션을 받아 schedule.json
-
 def get_race_sessions(years):
     """
     OpenF1 /sessions에서 각 연도의 Race 세션을 모두 가져와
     날짜 내림차순으로 정렬하여 중복 제거 후 반환.
     반환 스키마는 schedule.json에 맞춤.
     """
+    # ⬇︎ 정수 하나를 넘겨도 동작하도록 보정
+    if isinstance(years, int):
+        years = [years]
+
     sessions = []
     for y in years:
         url = f"{openf1url}/sessions?session_name=Race&year={y}"
@@ -241,7 +239,6 @@ def get_race_sessions(years):
                     sessions.append(item)
             except Exception:
                 pass
-
 
     seen = set()
     dedup_sorted = []
