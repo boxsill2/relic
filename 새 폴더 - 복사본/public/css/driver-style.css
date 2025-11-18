@@ -195,6 +195,44 @@
   text-align:right;
   letter-spacing:.2px;
 }
+/* Video preview grid */
+.video-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap:16px;
+  margin-top:10px;
+}
+.video-card{
+  position:relative;
+  border-radius:14px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.03);
+  aspect-ratio: 16/9;
+}
+.video-card img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.video-card .play-badge{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  font-weight:900;
+  font-size:42px;
+  line-height:1;
+  padding:.1em .35em;
+  background:rgba(0,0,0,.45);
+  border-radius:12px;
+}
+.video-card iframe{
+  width:100%;
+  height:100%;
+  display:block;
+}
 
 /* 반응형(상세) */
 @media (max-width: 900px){
@@ -202,3 +240,4 @@
   .driver-detail-page .driver-photo--full{ width:160px; }
   .driver-detail-page .stats-wrap{ grid-template-columns:1fr; }
 }
+

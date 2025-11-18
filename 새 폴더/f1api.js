@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 
 const driversData = require('./public/data/drivers.json');
 const driverDescriptions = require('./public/data/driver_descriptions.json');
-const teamsData = require('./public/data/teams.json');
+const teamsData = require('./public/data/teams.json'); // 팀 슬러그를 찾기 위해 필요
 
 const router = express.Router();
 const ROOT_DIR = __dirname;
@@ -61,7 +61,15 @@ function parseYouTube(url) {
 }
 
 // ---------- routes ----------
-router.get('/', (req, res) => res.redirect('/schedule'));
+
+// ✨ --- [수정됨] ---
+// 기본 경로('/')를 /schedule로 리디렉션하는 대신, 'home.ejs' 템플릿을 렌더링합니다.
+router.get('/', (req, res) => {
+  res.render('home', { 
+    currentPage: 'home' // 'home' 또는 '' (활성 탭 없음)
+  });
+});
+// ✨ --- 수정 끝 ---
 
 router.get('/schedule', (req, res) => {
   try {
@@ -121,15 +129,24 @@ router.get('/drivers/:driverName', (req, res) => {
   const rawList = Array.isArray(driverVideosMap[driver.slug]) ? driverVideosMap[driver.slug] : [];
   const videos = rawList.map(parseYouTube).filter(Boolean);
 
+  let teamSlug = null;
+  if (driver.team_name) {
+    const team = teamsData.find(t => t.name === driver.team_name);
+    if (team) {
+      teamSlug = team.slug; 
+    }
+  }
+
   const driverDetailData = {
     ...driver,
+    team_slug: teamSlug, 
     description: description || '설명 없음',
     stats: driverStats || { season: null, career: null },
   };
 
   res.render('driver-detail', {
     driver: driverDetailData,
-    videos, // 템플릿에서 바로 사용
+    videos, 
     currentPage: 'drivers',
     error: null,
   });

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>F1 리플레이</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/css/base.css?v=f1" />
+  <link rel="stylesheet" href="/css/header-style.css?v=f1" />
+</head>
+<body class="theme-f1">
+
+  <%- include('partials/header', { currentPage: 'home' }) %>
+
+  <main class="container">
+    <div style="text-align: center; padding: 60px 20px;">
+      
+      <h1 class="page-title" style="font-size: 32px;">
+        F1 리플레이 페이지에 오신걸 환영합니다!
+      </h1>
+      
+      <p class="page-desc" style="font-size: 18px; margin-top: 10px;">
+        상단 메뉴를 이용해 리플레이, 드라이버, 팀 정보를 확인하세요.
+      </p>
+
+      <div style="margin-top: 30px; display: flex; gap: 16px; justify-content: center;">
+        <a href="/schedule" class="btn btn--primary" style="padding: 12px 24px; font-size: 16px;">
+          리플레이 보러가기
+        </a>
+        <a href="/drivers" class="btn btn--ghost" style="padding: 12px 24px; font-size: 16px;">
+          드라이버 목록
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+</body>
+</html>
